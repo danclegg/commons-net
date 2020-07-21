@@ -2,7 +2,7 @@
 
 namespace ReportPortal.Shared.Reporter
 {
-    public interface IReporterInfo
+    public interface ITestReporterInfo
     {
         string Uuid { get; }
 
@@ -11,5 +11,7 @@ namespace ReportPortal.Shared.Reporter
         DateTime StartTime { get; }
 
         DateTime? FinishTime { get; }
+
+        string TestCaseId { get; set; }
     }
 }

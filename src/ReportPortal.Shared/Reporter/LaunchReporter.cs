@@ -78,7 +78,7 @@ namespace ReportPortal.Shared.Reporter
         }
 
         private LaunchInfo _launchInfo;
-        public IReporterInfo Info => _launchInfo;
+        public ILaunchReporterInfo Info => _launchInfo;
 
         private bool _isExternalLaunchId = false;
         private string _rerunOfUuid = null;

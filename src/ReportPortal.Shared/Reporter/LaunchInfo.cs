@@ -2,7 +2,7 @@
 
 namespace ReportPortal.Shared.Reporter
 {
-    public class LaunchInfo : IReporterInfo
+    public class LaunchInfo : ILaunchReporterInfo
     {
         public string Uuid { get; set; }
 

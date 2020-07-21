@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using ReportPortal.Client.Abstractions;
 using ReportPortal.Client.Abstractions.Requests;
+using ReportPortal.Client.Abstractions.Responses;
 using ReportPortal.Shared.Configuration;
 using ReportPortal.Shared.Extensibility;
 using ReportPortal.Shared.Extensibility.ReportEvents.EventArgs;
@@ -39,7 +42,7 @@ namespace ReportPortal.Shared.Reporter
         }
 
         private TestInfo _testInfo;
-        public IReporterInfo Info => _testInfo;
+        public ITestReporterInfo Info => _testInfo;
 
         public ILaunchReporter LaunchReporter { get; }
 
@@ -68,7 +71,7 @@ namespace ReportPortal.Shared.Reporter
 
                     if (pt.IsCanceled)
                     {
-                        exp = new Exception($"Cannot start test item due timeout while starting parent.");
+                        exp = new Exception($"Cannot start test item due timeout while starting parent.", pt.Exception);
                     }
 
                     TraceLogger.Error(exp.ToString());
@@ -76,6 +79,7 @@ namespace ReportPortal.Shared.Reporter
                 }
 
                 startTestItemRequest.LaunchUuid = LaunchReporter.Info.Uuid;
+                TestItemCreatedResponse testItemCreatedResponse;
                 if (ParentTestReporter == null)
                 {
                     if (startTestItemRequest.StartTime < LaunchReporter.Info.StartTime)
@@ -83,18 +87,11 @@ namespace ReportPortal.Shared.Reporter
                         startTestItemRequest.StartTime = LaunchReporter.Info.StartTime;
                     }
 
+                    AmendTestCaseId(startTestItemRequest);
+
                     NotifyStarting(startTestItemRequest);
 
-                    var testModel = await _requestExecuter.ExecuteAsync(() => _service.TestItem.StartAsync(startTestItemRequest), null).ConfigureAwait(false);
-
-                    _testInfo = new TestInfo
-                    {
-                        Uuid = testModel.Uuid,
-                        Name = startTestItemRequest.Name,
-                        StartTime = startTestItemRequest.StartTime
-                    };
-
-                    NotifyStarted();
+                    testItemCreatedResponse = await _requestExecuter.ExecuteAsync(() => _service.TestItem.StartAsync(startTestItemRequest), null).ConfigureAwait(false);
                 }
                 else
                 {
@@ -103,21 +100,23 @@ namespace ReportPortal.Shared.Reporter
                         startTestItemRequest.StartTime = ParentTestReporter.Info.StartTime;
                     }
 
+                    AmendTestCaseId(startTestItemRequest);
+
                     NotifyStarting(startTestItemRequest);
 
-                    var testModel = await _requestExecuter.ExecuteAsync(() => _service.TestItem.StartAsync(ParentTestReporter.Info.Uuid, startTestItemRequest), null).ConfigureAwait(false);
-
-                    _testInfo = new TestInfo
-                    {
-                        Uuid = testModel.Uuid,
-                        Name = startTestItemRequest.Name,
-                        StartTime = startTestItemRequest.StartTime
-                    };
-
-                    NotifyStarted();
+                    testItemCreatedResponse = await _requestExecuter.ExecuteAsync(() => _service.TestItem.StartAsync(ParentTestReporter.Info.Uuid, startTestItemRequest), null).ConfigureAwait(false);
                 }
 
-                _testInfo.StartTime = startTestItemRequest.StartTime;
+                _testInfo = new TestInfo
+                {
+                    Uuid = testItemCreatedResponse.Uuid,
+                    Name = startTestItemRequest.Name,
+                    StartTime = startTestItemRequest.StartTime,
+                    TestCaseId = startTestItemRequest.TestCaseId
+                };
+
+                NotifyStarted();
+
             }, TaskContinuationOptions.PreferFairness).Unwrap();
         }
 
@@ -334,6 +333,51 @@ namespace ReportPortal.Shared.Reporter
             catch (Exception exp)
             {
                 TraceLogger.Error($"Unhandled error while notifying test event observers: {exp}");
+            }
+        }
+
+        private void AmendTestCaseId(StartTestItemRequest startTestItemRequest)
+        {
+            StringBuilder stringBuilder = new StringBuilder(startTestItemRequest.Name);
+
+            if (startTestItemRequest.TestCaseId != null)
+            {
+                stringBuilder.Append(startTestItemRequest.TestCaseId);
+
+                if (startTestItemRequest.Parameters != null)
+                {
+                    foreach (var parameter in startTestItemRequest.Parameters)
+                    {
+                        stringBuilder.AppendLine(parameter.ToString());
+                    }
+                }
+            }
+            else if (startTestItemRequest.CodeReference != null)
+            {
+                stringBuilder.AppendLine(startTestItemRequest.CodeReference);
+
+                if (startTestItemRequest.Parameters != null)
+                {
+                    foreach (var parameter in startTestItemRequest.Parameters)
+                    {
+                        stringBuilder.AppendLine(parameter.ToString());
+                    }
+                }
+            }
+            else if (this.ParentTestReporter != null)
+            {
+                stringBuilder.AppendLine(this.ParentTestReporter.Info.TestCaseId);
+            }
+
+            using (var md5 = MD5.Create())
+            {
+                var hash = md5.ComputeHash(Encoding.ASCII.GetBytes(stringBuilder.ToString()));
+
+                StringBuilder md5Builder = new StringBuilder();
+                for (int i = 0; i < hash.Length; i++)
+                    md5Builder.Append(hash[i].ToString("x2"));
+
+                startTestItemRequest.TestCaseId = md5Builder.ToString();
             }
         }
     }

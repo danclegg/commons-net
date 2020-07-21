@@ -5,6 +5,8 @@ namespace ReportPortal.Shared.Reporter
 {
     public interface ILaunchReporter : IReporter
     {
+        ILaunchReporterInfo Info { get; }
+
         void Start(StartLaunchRequest startLaunchRequest);
 
         void Finish(FinishLaunchRequest finishLaunchRequest);
