@@ -338,48 +338,55 @@ namespace ReportPortal.Shared.Reporter
 
         private void AmendTestCaseId(StartTestItemRequest startTestItemRequest)
         {
-            StringBuilder stringBuilder = new StringBuilder(startTestItemRequest.Name);
+            StringBuilder md5SourceStringBuilder = new StringBuilder(startTestItemRequest.Name);
 
             if (startTestItemRequest.TestCaseId != null)
             {
-                stringBuilder.Append(startTestItemRequest.TestCaseId);
+                md5SourceStringBuilder.Append(startTestItemRequest.TestCaseId);
 
                 if (startTestItemRequest.Parameters != null)
                 {
                     foreach (var parameter in startTestItemRequest.Parameters)
                     {
-                        stringBuilder.AppendLine(parameter.ToString());
-                    }
-                }
-            }
-            else if (startTestItemRequest.CodeReference != null)
-            {
-                stringBuilder.AppendLine(startTestItemRequest.CodeReference);
-
-                if (startTestItemRequest.Parameters != null)
-                {
-                    foreach (var parameter in startTestItemRequest.Parameters)
-                    {
-                        stringBuilder.AppendLine(parameter.ToString());
+                        // add parameter string representation
+                        md5SourceStringBuilder.AppendLine("Key: ");
+                        if (parameter.Key != null)
+                        {
+                            md5SourceStringBuilder.Append(parameter.Key);
+                        }
+                        else
+                        {
+                            md5SourceStringBuilder.Append("null");
+                        }
+                        md5SourceStringBuilder.AppendLine("Value: ");
+                        if (parameter.Value != null)
+                        {
+                            md5SourceStringBuilder.Append(parameter.Value);
+                        }
+                        else
+                        {
+                            md5SourceStringBuilder.Append("null");
+                        }
                     }
                 }
             }
             else if (this.ParentTestReporter != null)
             {
-                stringBuilder.AppendLine(this.ParentTestReporter.Info.TestCaseId);
+                md5SourceStringBuilder.AppendLine(this.ParentTestReporter.Info.TestCaseId);
             }
 
             using (var md5 = MD5.Create())
             {
-                var hash = md5.ComputeHash(Encoding.ASCII.GetBytes(stringBuilder.ToString()));
+                var hash = md5.ComputeHash(Encoding.ASCII.GetBytes(md5SourceStringBuilder.ToString()));
 
                 StringBuilder md5Builder = new StringBuilder();
                 for (int i = 0; i < hash.Length; i++)
+                {
                     md5Builder.Append(hash[i].ToString("x2"));
+                }
 
                 startTestItemRequest.TestCaseId = md5Builder.ToString();
             }
         }
     }
-
 }

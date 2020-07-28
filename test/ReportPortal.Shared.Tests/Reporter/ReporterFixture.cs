@@ -14,7 +14,7 @@ using Xunit;
 
 namespace ReportPortal.Shared.Tests.Reporter
 {
-    public class ReporterTest
+    public class ReporterFixturecs
     {
         [Theory]
         [InlineData(1, 1, 0)]
